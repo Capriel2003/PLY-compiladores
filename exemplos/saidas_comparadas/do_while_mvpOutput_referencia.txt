@@ -1,0 +1,23 @@
+    INPP
+    AMEM 4	; i address: 0
+    AMEM 4	; temp (ponteiro)
+    CRCT 0
+    ARMZ 0,0	; i
+L1:
+    AMEM 4	; temp (ponteiro)
+    CRVL 0,0	; i
+    CRCT 1
+    SOMA
+    ARMZ 0,0	; i
+    CRVL 0,0	; i
+    IMPR
+    DMEM 4
+    CRVL 0,0	; i
+    CRCT 3
+    CMME	; <
+    DSVF L2
+    DSVS L1
+L2:
+    DMEM 8
+    PARA
+    FIM

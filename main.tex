@@ -1,0 +1,1581 @@
+\documentclass[12pt,a4paper]{article}
+
+% =========================================================
+% Pacotes
+% =========================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{caption}
+
+\geometry{
+    left=2.5cm,
+    right=2.5cm,
+    top=2.5cm,
+    bottom=2.5cm
+}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+% =========================================================
+% Configuração para códigos-fonte
+% =========================================================
+\definecolor{codegray}{rgb}{0.96,0.96,0.96}
+\definecolor{codeframe}{rgb}{0.8,0.8,0.8}
+\definecolor{codegreen}{rgb}{0.13,0.54,0.13}
+\definecolor{codeblue}{rgb}{0.0,0.2,0.7}
+\definecolor{codepurple}{rgb}{0.5,0.0,0.5}
+
+\lstset{
+    basicstyle=\ttfamily\footnotesize,
+    backgroundcolor=\color{codegray},
+    rulecolor=\color{codeframe},
+    frame=single,
+    breaklines=true,
+    showstringspaces=false,
+    tabsize=4,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    numbersep=7pt,
+    columns=fullflexible,
+    keepspaces=true
+}
+
+% =========================================================
+% Início do Documento
+% =========================================================
+\begin{document}
+
+\begin{titlepage}
+    \centering
+
+    {\Large Universidade Federal de Itajubá -- UNIFEI\par}
+    \vspace{0.4cm}
+
+    {\large Campus Avançado de Itabira\par}
+    \vspace{0.4cm}
+
+    {\large Engenharia de Computação\par}
+    \vspace{1.2cm}
+
+    {\Large ECOI2219 -- Compiladores\par}
+    \vspace{1.5cm}
+
+    {\Huge \textbf{Relatório Técnico -- Laboratório 1}\par}
+    \vspace{0.5cm}
+
+    {\LARGE Tradução Dirigida por Sintaxe com PLY\par}
+    \vspace{0.4cm}
+    {\large Da Análise Léxica à Máquina Virtual MEPA 5.0\par}
+
+    \vfill
+
+    \begin{flushleft}
+        \textbf{Integrantes da Equipe:}\\
+        Aluno 1\\
+        Aluno 2\\[0.5cm]
+
+        \textbf{Docente Responsável:} Prof. Walter Aoiama Nagai\\
+        \textbf{Disciplina:} ECOI2219 -- Compiladores
+    \end{flushleft}
+
+    \vfill
+
+    Itabira -- MG\\
+    Outubro de 2026
+
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% =========================================================
+\section{Introdução}
+% =========================================================
+
+A compilação de linguagens de programação fundamenta-se na decomposição do
+processo de tradução em etapas rigorosamente estruturadas: análise léxica,
+análise sintática, análise semântica e geração de código intermediário ou de
+máquina. Enquanto abordagens tradicionais frequentemente constroem uma Árvore
+Sintática Abstrata (AST) intermediária completa antes de percorrer seus nós
+para emitir código, a técnica de \textbf{Tradução Dirigida por Sintaxe}
+(\textit{Syntax-Directed Translation} -- SDT) propõe um acoplamento direto:
+as ações semânticas de verificação e emissão de código são executadas
+concomitantemente com as reduções da gramática livre de contexto.
+
+Este trabalho documenta o projeto, a implementação, a validação experimental e
+a auditoria técnica do compilador para a linguagem didática $\mu$C, orientado à
+emissão de instruções para a Máquina Virtual à Pilha (MEPA 5.0). O sistema foi
+reconstruído integralmente em Python com o auxílio da biblioteca PLY
+(\textit{Python Lex-Yacc}), cobrindo:
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+    \item \textbf{Passo 1 -- Analisador Léxico:} Reconhecimento de identificadores,
+          números inteiros, números reais em ponto flutuante e notação científica,
+          operadores relacionais/lógicos, comentários de linha e bloco, e
+          mapeamento de palavras reservadas;
+    \item \textbf{Passo 2 -- Tradução de Expressões:} Emissão em pós-ordem de
+          operações aritméticas sobre a máquina de pilha, respeitando precedência
+          e associatividade por meio de gramática estratificada em níveis;
+    \item \textbf{Passo 3 -- Declarações, Memória e Atribuição:} Gerenciamento de
+          tabela de símbolos, cálculo de deslocamentos (\textit{offsets}) em bytes
+          para os tipos primitivos \texttt{int} (4 bytes) e \texttt{float} (8 bytes),
+          atribuição de variáveis e escrita (\texttt{print});
+    \item \textbf{Passo 4 -- Comandos Condicionais:} Resolução do problema do
+          ``rótulo no meio'' (\textit{mid-rule actions}) por meio de produções
+          auxiliares e propagação de atributos herdados com pilhas de rótulos;
+    \item \textbf{Passo 5 -- Laços de Repetição e Desvios:} Padrão de repetição
+          \texttt{while} e implementação do comando \texttt{break} sensível ao
+          escopo do laço mais interno;
+    \item \textbf{Desafios 4.1 a 4.4:} Extensão com comando pós-testado
+          \texttt{do-while}, suporte a leitura com \texttt{read} e blocos aninhados
+          com preservação de alocação no prólogo, mapeamento estruturado com a
+          implementação Java de referência, e auditoria formal de código gerado por IA.
+\end{enumerate}
+
+Todas as decisões arquiteturais foram confrontadas empiricamente contra o
+compilador de referência em Java da disciplina (\texttt{uc-compilador.jar}) e
+validadas por execução direta no interpretador oficial MEPA 5.0.
+
+% =========================================================
+\section{Ambiente de Desenvolvimento}
+% =========================================================
+
+O ambiente de desenvolvimento e execução adotado pela equipe reúne:
+
+\begin{itemize}[leftmargin=1.5cm]
+    \item \textbf{Linguagem Base:} Python 3.13 (compatível com especificações Python $\ge$ 3.10);
+    \item \textbf{Gerador Léxico/Sintático:} Biblioteca PLY (\textit{Python Lex-Yacc}) versão 3.11;
+    \item \textbf{Máquina Virtual Alvo:} Interpretador MEPA 5.0 (\texttt{mepa\_pt.py} / \texttt{mepa.py}),
+          de autoria do Prof. Tomasz Kowaltowski;
+    \item \textbf{Compilador de Referência:} Implementação Java em analisador sintático
+          descendente recursivo (\texttt{uc-full/bin} e \texttt{uc-compilador.jar}),
+          executada sob Java SE Runtime Environment 25 LTS;
+    \item \textbf{Formatador e Tipografia:} Sistema \LaTeX{} (MiKTeX 25.4 / pdf\TeX{} 4.21).
+\end{itemize}
+
+A estrutura de arquivos do projeto está organizada como segue:
+
+\begin{lstlisting}[numbers=none]
+lab/
+|-- lab1_tds.py          # Codigo-fonte completo do compilador
+|-- modulo4-lab1.pdf     # Guia oficial de requisitos da atividade
+|-- main.tex             # Codigo-fonte do relatorio tecnico em LaTeX
+|-- exemplos/            # Suite de testes em linguagem uC (.uc)
+|   |-- expr.uc          # Expressoes basicas e atribuicao
+|   |-- if_else.uc       # Desvio condicional if-else
+|   |-- while.uc         # Repeticao pre-testada
+|   |-- break.uc         # Interrupcao controlada por break
+|   |-- do_while.uc      # Desafio 4.1: repeticao pos-testada
+|   |-- fib.uc           # Desafio 4.2: Fibonacci, read e blocos aninhados
+|   |-- erro_var.uc      # Rejeicao semantica de variavel nao declarada
+|   `-- erro_break.uc    # Rejeicao semantica de break fora de laco
+|-- mepa/                # Interpretador MEPA 5.0 oficial
+`-- uc-full/             # Compilador uC de referencia (Java / dist / bin)
+\end{lstlisting}
+
+% =========================================================
+\section{Passo 1 -- Analisador Léxico}
+% =========================================================
+
+\subsection{Princípios e Regras Léxicas}
+
+O analisador léxico (\textit{scanner}) tem a responsabilidade primária de transformar
+a sequência contínua de caracteres do arquivo-fonte em uma sequência de unidades
+significativas denominadas \textit{tokens}.
+
+No PLY, o analisador léxico é instanciado através do módulo \texttt{ply.lex}. O
+módulo emprega introspecção em Python: variáveis com o prefixo \texttt{t\_} que
+contêm expressões regulares ou funções definem o padrão dos tokens.
+
+\subsection{Palavras Reservadas e Identificadores}
+
+Para evitar colisões léxicas e proliferação desnecessária de expressões regulares,
+adotou-se o padrão clássico da tabela de palavras-chave: todos os identificadores
+são capturados pela expressão regular de \texttt{t\_ID}, e em seguida o lexema é
+consultado no dicionário \texttt{reserved}:
+
+\begin{lstlisting}[language=Python]
+reserved = {
+    "if": "IF",
+    "else": "ELSE",
+    "while": "WHILE",
+    "do": "DO",          # Desafio 4.1
+    "read": "READ",      # Desafio 4.2
+    "break": "BREAK",
+    "print": "PRINT",
+    "true": "TRUE",
+    "false": "FALSE",
+    "int": "INT",
+    "float": "FLOAT",
+}
+
+def t_ID(t):
+    r"[a-zA-Z_][a-zA-Z0-9_]*"
+    t.type = reserved.get(t.value, "ID")
+    return t
+\end{lstlisting}
+
+Essa decisão garante que identificadores válidos como \texttt{ifx} ou \texttt{while\_count}
+permaneçam classificados como \texttt{ID}, enquanto o lexema exato \texttt{if} é promovido
+ao token \texttt{IF}.
+
+\subsection{Operadores e a Regra do Maximal Munch}
+
+Os operadores relacionais, lógicos e de atribuição foram definidos conforme a tabela
+oficial do roteiro:
+
+\begin{center}
+\begin{tabular}{cclc}
+\toprule
+\textbf{Token} & \textbf{Texto} & \textbf{Expressão Regular no PLY} & \textbf{Significado} \\
+\midrule
+\texttt{EQ}     & \texttt{==}  & \texttt{r"=="}                  & Igualdade relacional \\
+\texttt{NE}     & \texttt{!=}  & \texttt{r"!="}                  & Diferença relacional \\
+\texttt{LE}     & \texttt{<=}  & \texttt{r"<="}                  & Menor ou igual \\
+\texttt{GE}     & \texttt{>=}  & \texttt{r">="}                  & Maior ou igual \\
+\texttt{AND}    & \texttt{\&\&}& \texttt{r"\&\&"}                & Conjunção lógica \\
+\texttt{OR}     & \texttt{||}  & \texttt{r"\textbackslash|\textbackslash|"} & Disjunção lógica \\
+\texttt{NOT}    & \texttt{!}   & \texttt{r"!"}                   & Negação unária \\
+\texttt{LT}     & \texttt{<}   & \texttt{r"<"}                   & Menor que \\
+\texttt{GT}     & \texttt{>}   & \texttt{r">"}                   & Maior que \\
+\texttt{ASSIGN} & \texttt{=}   & \texttt{r"="}                   & Atribuição \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{O princípio do Maximal Munch:} Quando o compilador processa uma cadeia
+como \texttt{<=} ou \texttt{==}, o PLY classifica internamente as expressões regulares
+de comprimento fixo por ordem decrescente de tamanho da expressão. Dessa forma,
+a expressão \texttt{r"<="} (2 caracteres) tem prioridade determinística sobre
+\texttt{r"<"} (1 caractere). O lexer consome a maior cadeia de caracteres possível que
+forme um token válido, impedindo que \texttt{<=} seja fragmentado erroneamente em
+\texttt{<} seguido de \texttt{=}.
+
+\subsection{Tratamento Numérico: Inteiros e Notação Científica}
+
+O roteiro prevê o reconhecimento de inteiros (\texttt{NUM}) e números reais (\texttt{REAL}):
+
+\begin{lstlisting}[language=Python]
+def t_REAL(t):
+    r"\d+\.\d+([eE][+-]?\d+)?|\d+[eE][+-]?\d+"
+    t.value = float(t.value)
+    return t
+
+def t_NUM(t):
+    r"\d+"
+    t.value = int(t.value)
+    return t
+\end{lstlisting}
+
+A expressão regular adotada para \texttt{t\_REAL} foi expandida para suportar
+tanto a representação fracionária padrão (\texttt{3.14}) quanto notação exponencial
+comum em programas científicos (\texttt{3.14e-2}, \texttt{1e5}), alinhando-se
+perfeitamente com o compilador Java de referência (\texttt{Lexer.java}).
+
+\subsection{Comentários, Linhas e Erros Léxicos}
+
+Espaços em branco, quebras de linha e comentários devem ser descartados sem
+gerar tokens sintáticos, mas mantendo a numeração precisa das linhas:
+
+\begin{lstlisting}[language=Python]
+t_ignore = " \t\r"
+
+def t_newline(t):
+    r"\n+"
+    t.lexer.lineno += len(t.value)
+
+def t_COMMENT_LINE(t):
+    r"//[^\n]*"
+    pass
+
+def t_COMMENT_BLOCK(t):
+    r"/\*[\s\S]*?\*/"
+    t.lexer.lineno += t.value.count("\n")
+
+def t_error(t):
+    print(f"erro lexico na linha {t.lexer.lineno}: caractere ilegal {t.value[0]!r}", file=sys.stderr)
+    t.lexer.skip(1)
+\end{lstlisting}
+
+\subsection{Validação Experimental do Analisador Léxico}
+
+O teste proposto no roteiro foi executado com o comando:
+\begin{lstlisting}[language=bash]
+python lab1_tds.py exemplos/expr.uc --tokens
+\end{lstlisting}
+
+\noindent O programa de teste \texttt{exemplos/expr.uc} contém:
+\begin{lstlisting}[language=C]
+{
+    int a;
+    a = 1 + 2;
+}
+\end{lstlisting}
+
+\noindent A saída obtida no console correspondeu exatamente à especificação:
+\begin{lstlisting}
+  1 {          '{'
+  2 INT        'int'
+  2 ID         'a'
+  2 ;          ';'
+  3 ID         'a'
+  3 ASSIGN     '='
+  3 NUM        1
+  3 +          '+'
+  3 NUM        2
+  3 ;          ';'
+  4 }          '}'
+\end{lstlisting}
+
+Observa-se que:
+\begin{itemize}
+    \item \texttt{int} foi reconhecido como \texttt{INT} (palavra reservada), e não como \texttt{ID};
+    \item Os identificadores \texttt{a} foram reconhecidos como \texttt{ID};
+    \item Os inteiros \texttt{1} e \texttt{2} foram convertidos para inteiros nativos do Python;
+    \item As contagens de linhas acompanharam perfeitamente o arquivo-fonte.
+\end{itemize}
+
+% =========================================================
+\section{Passo 2 -- Tradução de Expressões}
+% =========================================================
+
+\subsection{Teoria da Tradução Dirigida por Sintaxe (SDT)}
+
+Na tradução dirigida por sintaxe associada a analisadores do tipo \textit{bottom-up}
+(como o LALR(1) gerado pelo PLY/Yacc), as ações semânticas associadas a cada regra
+são disparadas exclusivamente quando a produção atinge sua \textbf{redução}.
+
+Considere a gramática tradicional com atributos sintetizados:
+\begin{align*}
+    E &\rightarrow E_1 + T \quad & \{ E.val = E_1.val + T.val \} \\
+    E &\rightarrow T           & \{ E.val = T.val \} \\
+    T &\rightarrow \text{\textbf{num}} & \{ T.val = \text{\textbf{num}}.lexval \}
+\end{align*}
+
+Num compilador para máquina de pilha (MEPA), o objetivo não é calcular o valor numérico
+em tempo de compilação, mas emitir as instruções que colocarão os operandos na pilha
+e em seguida dispararão a operação correspondente.
+
+\subsection{Por que a Ordem Funciona: Pós-Ordem na Árvore de Derivação}
+
+Na análise ascendente LALR, as folhas da árvore sintática são reconhecidas e reduzidas
+primeiro. Os nós intermediários reduzem depois dos nós filhos, e a raiz reduz por
+último. Trata-se de uma travessia estrita em \textbf{pós-ordem}:
+\begin{center}
+\textbf{Filho Esquerdo} $\rightarrow$ \textbf{Filho Direito} $\rightarrow$ \textbf{Nó Pai}
+\end{center}
+
+Para a expressão:
+\[
+a + 2
+\]
+O autômato executa as seguintes reduções e emissões:
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Redução} & \textbf{Instrução Emitida} & \textbf{Estado da Pilha MEPA} \\
+\midrule
+\texttt{factor : ID(a)}     & \texttt{CRVL 0,0} & $[a]$ \\
+\texttt{factor : NUM(2)}    & \texttt{CRCT 2}   & $[a, 2]$ \\
+\texttt{expr : expr + term} & \texttt{SOMA}     & $[a + 2]$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Como o operador \texttt{SOMA} desempilha os dois valores do topo da pilha, realiza a adição
+e empilha o resultado, a pós-ordem natural das reduções do parser ascendente é
+\textbf{rigorosamente a ordem esperada por uma máquina de pilha}.
+
+\subsection{Resolução de Precedência por Níveis de Produção}
+
+Para eliminar ambiguidades sintáticas e garantir associatividade à esquerda sem
+necessidade de declarar prioridades artificiais, a gramática de expressões do $\mu$C
+foi estruturada em quatro níveis hierárquicos:
+
+\begin{align*}
+    \text{expr}  &\rightarrow \text{expr } '+' \text{ term} \mid \text{expr } '-' \text{ term} \mid \text{term} \\
+    \text{term}  &\rightarrow \text{term } '*' \text{ unary} \mid \text{term } '/' \text{ unary} \mid \text{unary} \\
+    \text{unary} &\rightarrow '-' \text{ unary} \mid '+' \text{ unary} \mid \text{factor} \\
+    \text{factor}&\rightarrow \text{\textbf{id}} \mid \text{\textbf{num}} \mid \text{\textbf{real}} \mid \text{\textbf{true}} \mid \text{\textbf{false}} \mid '(' \text{bool} ')'
+\end{align*}
+
+\noindent\textbf{Armadilha evitada:} A produção simplória \texttt{expr : expr '+' expr}
+introduz ambiguidades e gera conflitos \textit{shift/reduce}. Por padrão, o Yacc/PLY
+desempataria realizando o \textit{shift}, o que acarretaria associatividade à direita
+(incorreta para subtração e divisão). A gramática em níveis força o agrupamento à esquerda:
+para reduzir \texttt{a - b - c}, o compilador é obrigado a reduzir \texttt{a - b} primeiro.
+
+\subsection{Implementação no PLY}
+
+As funções correspondentes no arquivo \texttt{lab1\_tds.py} são implementadas de
+forma modular:
+
+\begin{lstlisting}[language=Python]
+def p_expr_plus(p):
+    "expr : expr '+' term"
+    emit("SOMA")
+
+def p_expr_minus(p):
+    "expr : expr '-' term"
+    emit("SUBT")
+
+def p_term_times(p):
+    "term : term '*' unary"
+    emit("MULT")
+
+def p_term_divide(p):
+    "term : term '/' unary"
+    emit("DIVI")
+
+def p_unary_minus(p):
+    "unary : '-' unary"
+    emit("INVR")
+
+def p_factor_num(p):
+    "factor : NUM"
+    emit(f"CRCT {p[1]}")
+
+def p_factor_real(p):
+    "factor : REAL"
+    emit(f"CRCT {p[1]}")
+\end{lstlisting}
+
+\subsection{Verificação Experimental de Precedência}
+
+Comparou-se a tradução de duas expressões com precedências distintas:
+
+\begin{enumerate}
+    \item \textbf{Sem parênteses:} \texttt{a + b * 3}
+          \begin{lstlisting}
+CRVL 0,0    ; a
+CRVL 0,4    ; b
+CRCT 3
+MULT        ; multiplicacao ocorre primeiro
+SOMA        ; soma ocorre por ultimo
+          \end{lstlisting}
+    \item \textbf{Com parênteses:} \texttt{(a + b) * 3}
+          \begin{lstlisting}
+CRVL 0,0    ; a
+CRVL 0,4    ; b
+SOMA        ; soma ocorre primeiro devido aos parenteses
+CRCT 3
+MULT        ; multiplicacao ocorre depois
+          \end{lstlisting}
+\end{enumerate}
+
+O teste comprovou a aderência estrita à precedência algébrica padrão.
+
+% =========================================================
+\section{Passo 3 -- Declarações, Memória, Atribuição e Escrita}
+% =========================================================
+
+\subsection{Tabela de Símbolos e Deslocamento Global}
+
+Para vincular identificadores a posições de memória, o compilador mantém o estado
+de alocação através de:
+
+\begin{lstlisting}[language=Python]
+OFFSET = 0       # Proximo endereco disponivel na memoria
+SYMBOLS = {}      # Tabela com o deslocamento de cada variavel
+SCOPES = []       # Pilha de dicionarios para controle de escopo lexico
+ALLOCATIONS = []  # Instrucoes AMEM coletadas para emissao no prologo
+\end{lstlisting}
+
+\subsection{Larguras de Tipos e Alocação de Memória}
+
+Na linguagem $\mu$C, variáveis inteiras (\texttt{int}) possuem largura de 4 bytes,
+enquanto números reais (\texttt{float}) possuem largura de 8 bytes (conforme a
+classe \texttt{symbols/Type.java} do compilador de referência):
+
+\begin{lstlisting}[language=Python]
+def p_decl_int(p):
+    "decl : INT ID ';'"
+    declare_symbol(p[2], 4, p.lineno(2))
+
+def p_decl_float(p):
+    "decl : FLOAT ID ';'"
+    declare_symbol(p[2], 8, p.lineno(2))
+\end{lstlisting}
+
+A função \texttt{declare\_symbol} insere o identificador no escopo ativo, armazena
+o \textit{offset} atual e incrementa a contagem de memória:
+
+\begin{lstlisting}[language=Python]
+def declare_symbol(name, width, line):
+    global OFFSET
+    if name in SCOPES[-1]:
+        semantic_error(f"linha {line}: variavel {name!r} ja declarada no bloco")
+    SCOPES[-1][name] = OFFSET
+    SYMBOLS[name] = OFFSET
+    ALLOCATIONS.append(f"AMEM {width}\t; {name} address: {OFFSET}")
+    OFFSET += width
+\end{lstlisting}
+
+\noindent\textbf{Princípio do Offset Sequencial Global:} O \textit{offset} jamais é
+reiniciado na abertura de blocos aninhados \texttt{\{ \dots \}}. A numeração sequencial
+é mantida para garantir que nenhuma variável sobrescreva a célula de memória de outra.
+Para o trecho:
+\begin{lstlisting}[language=C]
+{
+    int a;
+    float x;
+}
+\end{lstlisting}
+O compilador emite:
+\begin{lstlisting}
+AMEM 4    ; a address: 0
+AMEM 8    ; x address: 4
+\end{lstlisting}
+Totalizando 12 bytes alocados e resultando em $\text{OFFSET} = 12$.
+
+\subsection{Atribuição, Leitura de Variáveis e Escrita}
+
+A atribuição requer que o valor resultante da expressão seja armazenado na célula
+de memória correspondente:
+
+\begin{lstlisting}[language=Python]
+def p_stmt_assign(p):
+    "stmt : ID ASSIGN bool ';'"
+    address = lookup_symbol(p[1], p.lineno(1))
+    emit(f"ARMZ 0,{address}\t; {p[1]}")
+
+def p_factor_id(p):
+    "factor : ID"
+    address = lookup_symbol(p[1], p.lineno(1))
+    emit(f"CRVL 0,{address}\t; {p[1]}")
+
+def p_stmt_print(p):
+    "stmt : PRINT '(' bool ')' ';'"
+    emit("IMPR")
+\end{lstlisting}
+
+A busca de identificadores (\texttt{lookup\_symbol}) percorre a pilha \texttt{SCOPES}
+da posição mais profunda para a mais externa:
+
+\begin{lstlisting}[language=Python]
+def lookup_symbol(name, line):
+    for scope in reversed(SCOPES):
+        if name in scope:
+            return scope[name]
+    semantic_error(f"linha {line}: variavel {name!r} nao declarada ou fora do escopo")
+\end{lstlisting}
+
+Se a variável não for encontrada, o compilador dispara um erro semântico amigável
+com coordenadas de linha e encerra a compilação via \texttt{SystemExit(1)}, impedindo
+a propagação de exceções brutas do Python como \texttt{KeyError}.
+
+% =========================================================
+\section{Passo 4 -- Comando Condicional e o Problema do Rótulo no Meio}
+% =========================================================
+
+\subsection{O Problema Identificado}
+
+O padrão semântico esperado para uma instrução condicional \texttt{if} é:
+\begin{lstlisting}[numbers=none]
+    [codigo que avalia a condicao]
+    DSVF L1        ; se falso, desvia para L1
+    [codigo do corpo do comando]
+L1: NADA
+\end{lstlisting}
+
+A tentativa ingênua de codificar essa estrutura no PLY consiste em escrever:
+\begin{lstlisting}[language=Python]
+# TENTATIVA INCORRETA:
+def p_stmt_if(p):
+    "stmt : IF '(' bool ')' stmt"
+    l1 = new_label()
+    emit(f"DSVF {l1}")  # EMISSAO TARDE DEMAIS!
+    emit(f"{l1}: NADA")
+\end{lstlisting}
+
+\noindent\textbf{Por que a tentativa ingênua falha criticamente?} No modelo de
+análise ascendente LALR, uma função sintática só é disparada após \textbf{todos}
+os símbolos do corpo da produção terem sido completamente reduzidos. Isso significa
+que todo o código do corpo (\texttt{stmt}) já foi emitido antes que o corpo da função
+\texttt{p\_stmt\_if} seja invocado.
+Como consequência, a instrução \texttt{DSVF L1} seria emitida \textbf{depois} do corpo
+que ela deveria desviar! O programa compilaria sem erros visíveis, porém na execução
+o desvio jamais pularia o bloco \texttt{then}, desvirtuando por completo a semântica
+do programa.
+
+\subsection{A Solução: Regra Auxiliar com Atributo Herdado}
+
+Para resolver o problema, é necessário que uma redução intermediária ocorra
+\textbf{imediatamente após o teste da condição e antes da entrada no corpo}.
+A produção principal é desmembrada em duas:
+
+\begin{lstlisting}[language=Python]
+IF_PENDING = []
+
+def p_if_head(p):
+    "if_head : IF '(' bool ')'"
+    false_label = new_label()
+    end_label = new_label()
+    emit(f"DSVF {false_label}")  # Emitido exatamente no ponto correto!
+    IF_PENDING.append((false_label, end_label))
+
+def p_stmt_if(p):
+    "stmt : if_head stmt %prec IFX"
+    false_label, _ = IF_PENDING.pop()
+    mark_label(false_label)
+\end{lstlisting}
+
+\noindent\textbf{A mecânica de atributos herdados via pilhas do módulo:}
+Em teoria de compiladores, quando uma regra filha precisa de um valor gerado
+anteriormente por uma regra irmã ou pai, esse dado é denominado \textbf{atributo herdado}.
+Como o PLY só propaga atributos sintetizados naturalmente através de \texttt{p[0]},
+o estado herdado viaja através de pilhas de variáveis no escopo do módulo
+(\texttt{IF\_PENDING}).
+
+\subsection{Comando \texttt{if-else} e Ambiguidade do Dangling Else}
+
+Para a estrutura completa \texttt{if-else}, o padrão exige desviar o ramo \texttt{then}
+ao término de sua execução para não invadir o ramo \texttt{else}:
+
+\begin{lstlisting}[language=Python]
+def p_else_mark(p):
+    "else_mark :"
+    false_label, end_label = IF_PENDING[-1]
+    emit(f"DSVS {end_label}")      # Pula o ramo else ao fim do then
+    mark_label(false_label)        # Ponto de entrada do ramo else
+
+def p_stmt_if_else(p):
+    "stmt : if_head stmt ELSE else_mark stmt"
+    _, end_label = IF_PENDING.pop()
+    mark_label(end_label)          # Ponto de juncao final
+\end{lstlisting}
+
+\noindent\textbf{Por que \texttt{IF\_PENDING} deve ser uma pilha?} Em construções com
+condicionais aninhados como:
+\begin{lstlisting}[language=C]
+if (a > 0)
+    if (b > 0)
+        print(1);
+\end{lstlisting}
+o \texttt{if} interno instancia seus próprios rótulos. Se fosse utilizada uma variável
+simples, os rótulos do \texttt{if} externo seriam irremediavelmente sobrescritos.
+Com a estrutura em pilha (LIFO), o \texttt{if} mais interno consome o topo da pilha,
+restaurando perfeitamente o contexto do \texttt{if} externo.
+
+A ambiguidade clássica do \textit{dangling else} (onde o compilador precisa decidir
+a qual \texttt{if} pertence uma cláusula \texttt{else} isolada) foi tratada atribuindo
+precedência sintática via:
+\begin{lstlisting}[language=Python]
+precedence = (
+    ("nonassoc", "IFX"),
+    ("nonassoc", "ELSE"),
+)
+\end{lstlisting}
+associando deterministicamente o \texttt{else} ao \texttt{if} imediatamente precedente.
+
+\subsection{Validação Experimental do Condicional}
+
+Utilizou-se o programa \texttt{exemplos/if\_else.uc}:
+\begin{lstlisting}[language=C]
+{
+    int a;
+    a = 5;
+    if (a > 0)
+        a = 1;
+    else
+        a = 2;
+    print(a);
+}
+\end{lstlisting}
+
+O código MEPA gerado por \texttt{lab1\_tds.py} foi:
+\begin{lstlisting}
+INPP
+AMEM 4    ; a address: 0
+CRCT 5
+ARMZ 0,0  ; a
+CRVL 0,0  ; a
+CRCT 0
+CMMA
+DSVF L1
+CRCT 1
+ARMZ 0,0  ; a
+DSVS L2
+L1: NADA
+CRCT 2
+ARMZ 0,0  ; a
+L2: NADA
+CRVL 0,0  ; a
+IMPR
+PARA
+FIM
+\end{lstlisting}
+
+\noindent\textbf{Resultados da execução no MEPA:}
+\begin{itemize}
+    \item Para $a = 5$ (condição verdadeira): executou 15 instruções e imprimiu \textbf{1};
+    \item Para $a = -5$ (condição falsa): executou 16 instruções e imprimiu \textbf{2}.
+\end{itemize}
+Ambos os ramos executaram com 100\% de fidelidade semântica.
+
+% =========================================================
+\section{Passo 5 -- Laços de Repetição e Desvios (\texttt{while} e \texttt{break})}
+% =========================================================
+
+\subsection{Padrão de Tradução do Laço \texttt{while}}
+
+Diferentemente do \texttt{if}, em que o desvio aponta sempre para a frente, o laço
+de repetição exige um salto para trás (\textit{back-jump}). Para que o comando possa
+retornar à verificação da condição, o rótulo de início precisa ser emitido
+\textbf{antes} da avaliação da expressão booleana.
+
+O padrão implementado utiliza duas produções auxiliares:
+\begin{lstlisting}[language=Python]
+WHILE_PENDING = []
+LOOP_EXITS = []
+
+def p_while_start(p):
+    "while_start :"
+    start_label = new_label()
+    exit_label = new_label()
+    mark_label(start_label)        # Rotulo de retorno antes da condicao
+    WHILE_PENDING.append((start_label, exit_label))
+    LOOP_EXITS.append(exit_label)  # Registra saida para comandos break
+
+def p_while_head(p):
+    "while_head : WHILE '(' while_start bool ')'"
+    _, exit_label = WHILE_PENDING[-1]
+    emit(f"DSVF {exit_label}")     # Sai do laco se a condicao for falsa
+
+def p_stmt_while(p):
+    "stmt : while_head stmt"
+    start_label, exit_label = WHILE_PENDING.pop()
+    LOOP_EXITS.pop()
+    emit(f"DSVS {start_label}")    # Volta para a condicao
+    mark_label(exit_label)         # Rotulo de saida do laco
+\end{lstlisting}
+
+\subsection{Implementação do Comando \texttt{break}}
+
+O comando \texttt{break} interrompe abruptamente o laço, transferindo o fluxo de
+controle para o rótulo de término do laço mais interno. A pilha \texttt{LOOP\_EXITS}
+armazena exatamente esses rótulos:
+
+\begin{lstlisting}[language=Python]
+def p_stmt_break(p):
+    "stmt : BREAK ';'"
+    if not LOOP_EXITS:
+        semantic_error(f"linha {p.lineno(1)}: break fora de um laco")
+    emit(f"DSVS {LOOP_EXITS[-1]}\t; break")
+\end{lstlisting}
+
+\noindent\textbf{Melhoria Documentada em Relação ao Compilador de Referência:}
+Conforme alertado na Seção 10.2 do guia da disciplina, o compilador Java de referência
+valida a ocorrência de \texttt{break} verificando a variável \texttt{loopDepth > 0},
+porém \textbf{omite a geração da instrução DSVS correspondente} em \texttt{Parser.java}.
+Como consequência, programas compilados pelo compilador de referência ignoravam o
+\texttt{break} e executavam o laço até o fim.
+O compilador desenvolvido pela nossa equipe corrige essa falha, emitindo explicitamente
+\texttt{DSVS} para o rótulo de saída do laço corrente.
+
+\subsection{Validação Experimental do Laço e do Break}
+
+\subsubsection{Teste do Laço Padrão (\texttt{exemplos/while.uc})}
+
+\begin{lstlisting}[language=C]
+{
+    int k;
+    k = 1;
+    while (k <= 5) {
+        print(k);
+        k = k + 1;
+    }
+}
+\end{lstlisting}
+
+O código MEPA gerado foi:
+\begin{lstlisting}
+INPP
+AMEM 4    ; k address: 0
+CRCT 1
+ARMZ 0,0  ; k
+L1: NADA  ; inicio do teste
+CRVL 0,0  ; k
+CRCT 5
+CMEG
+DSVF L2   ; sai para L2 se k > 5
+CRVL 0,0  ; k
+IMPR
+CRVL 0,0  ; k
+CRCT 1
+SOMA
+ARMZ 0,0  ; k
+DSVS L1   ; reinicia laco
+L2: NADA  ; saida
+PARA
+FIM
+\end{lstlisting}
+
+Executado no interpretador MEPA 5.0, realizou 71 instruções e produziu:
+\begin{lstlisting}
+1
+2
+3
+4
+5
+\end{lstlisting}
+
+\subsubsection{Teste de Interrupção por \texttt{break} (\texttt{exemplos/break.uc})}
+
+\begin{lstlisting}[language=C]
+{
+    int k;
+    k = 1;
+    while (k <= 10) {
+        if (k > 5)
+            break;
+        print(k);
+        k = k + 1;
+    }
+}
+\end{lstlisting}
+
+O código MEPA gerado emite a instrução de salto do break:
+\begin{lstlisting}
+...
+L1: NADA
+CRVL 0,0    ; k
+CRCT 10
+CMEG
+DSVF L2     ; saida do while
+CRVL 0,0    ; k
+CRCT 5
+CMMA
+DSVF L3     ; desvio do if
+DSVS L2     ; break desvia diretamente para a saida L2!
+L3: NADA
+CRVL 0,0    ; k
+IMPR
+...
+\end{lstlisting}
+
+Executado no MEPA, o programa imprimiu exatamente os valores \texttt{1, 2, 3, 4, 5}
+e encerrou a execução imediatamente após a ativação do desvio de interrupção.
+
+\subsubsection{Teste de Rejeição de \texttt{break} Fora de Laço}
+
+Para o arquivo \texttt{exemplos/erro\_break.uc}:
+\begin{lstlisting}[language=C]
+{
+    int a;
+    break;
+}
+\end{lstlisting}
+
+A execução de \texttt{python lab1\_tds.py exemplos/erro\_break.uc} reportou:
+\begin{lstlisting}
+erro semantico: linha 3: break fora de um laco
+\end{lstlisting}
+comprovando a eficácia da guarda semântica baseada na pilha \texttt{LOOP\_EXITS}.
+
+% =========================================================
+\section{Execução no MEPA 5.0}
+% =========================================================
+
+\subsection{Arquitetura e Exigências Formais do MEPA}
+
+O interpretador MEPA 5.0 (\texttt{mepa\_pt.py}), desenvolvido para o ensino de
+compiladores, impõe exigências rígidas de formatação:
+\begin{itemize}
+    \item Todo programa deve iniciar com a instrução de carga \texttt{INPP} e
+          terminar com as instruções \texttt{PARA} e \texttt{FIM};
+    \item Instruções de manipulação de memória (\texttt{CRVL}, \texttt{ARMZ}) exigem
+          dois argumentos separados por vírgula no formato $m,n$, onde $m$ representa
+          o nível léxico e $n$ o deslocamento (como $\mu$C não possui sub-rotinas
+          aninhadas, $m=0$ sempre);
+    \item \textbf{Alinhamento de Rótulos:} O MEPA 5.0 exige obrigatoriamente que
+          rótulos estejam na \textbf{mesma linha} de uma instrução executável. Linhas
+          isoladas contendo apenas \texttt{L1:} provocam erro de sintaxe no carregador.
+\end{itemize}
+
+\subsection{Eliminação de Dependência Externa: O Padrão \texttt{mark\_label}}
+
+No laboratório de referência em Java, o compilador emitia rótulos em linhas isoladas,
+obrigando o uso de um script externo em \texttt{awk} ou \texttt{sed} para juntar
+linhas antes de executar na MEPA:
+
+\begin{lstlisting}[language=bash]
+awk '/^[[:space:]]*L[0-9]+:[[:space:]]*$/ {p=$1; next}
+{if (p!="") {sub(/^[[:space:]]*/,""); print p" "$0} else print; p=""}' mvpOutput.txt > mvp.mepa
+\end{lstlisting}
+
+A nossa implementação em Python superou essa limitação criando a função auxiliar:
+\begin{lstlisting}[language=Python]
+def mark_label(label):
+    emit(f"{label}: NADA")
+\end{lstlisting}
+
+Como a instrução \texttt{NADA} (\textit{no-operation}) é uma instrução oficial
+reconhecida pelo MEPA, os rótulos gerados pelo nosso compilador já saem prontos
+para consumo imediato pelo interpretador, eliminando completamente a necessidade de
+conversões intermediárias.
+
+% =========================================================
+\section{Desafios Implementados}
+% =========================================================
+
+\subsection{Desafio 4.1 -- Comando Pós-Testado \texttt{do-while}}
+
+O comando pós-testado \texttt{do stmt while ( bool ) ;} difere estruturalmente do
+\texttt{while} pré-testado porque o corpo é executado obrigatoriamente pelo menos
+uma vez antes do primeiro teste lógico.
+
+\subsubsection{Implementação Sintática e Semântica}
+
+Por executar o corpo primeiro, não há o problema do ``rótulo no meio'': o rótulo
+de início é posicionado antes do corpo, e a condição é testada no final:
+
+\begin{lstlisting}[language=Python]
+DO_PENDING = []
+
+def p_do_head(p):
+    "do_head : DO"
+    start_label = new_label()
+    exit_label = new_label()
+    mark_label(start_label)
+    DO_PENDING.append((start_label, exit_label))
+    LOOP_EXITS.append(exit_label)
+
+def p_stmt_do(p):
+    "stmt : do_head stmt WHILE '(' bool ')' ';'"
+    start_label, exit_label = DO_PENDING.pop()
+    LOOP_EXITS.pop()
+    emit(f"DSVF {exit_label}")   # Se falsa, encerra
+    emit(f"DSVS {start_label}")   # Se verdadeira, reexecuta corpo
+    mark_label(exit_label)
+\end{lstlisting}
+
+\subsubsection{Validação Experimental (\texttt{exemplos/do\_while.uc})}
+
+\begin{lstlisting}[language=C]
+{
+    int i;
+    i = 0;
+    do {
+        i = i + 1;
+        print(i);
+    } while (i < 3);
+}
+\end{lstlisting}
+
+O compilador produziu a sequência MEPA:
+\begin{lstlisting}
+INPP
+AMEM 4    ; i address: 0
+CRCT 0
+ARMZ 0,0  ; i
+L1: NADA  ; corpo executado diretamente
+CRVL 0,0  ; i
+CRCT 1
+SOMA
+ARMZ 0,0  ; i
+CRVL 0,0  ; i
+IMPR
+CRVL 0,0  ; i
+CRCT 3
+CMME      ; i < 3
+DSVF L2
+DSVS L1   ; volta ao inicio se i < 3
+L2: NADA
+PARA
+FIM
+\end{lstlisting}
+
+Executado no interpretador MEPA 5.0, produziu a sequência:
+\begin{lstlisting}
+1
+2
+3
+\end{lstlisting}
+comprovando o pleno funcionamento da estrutura pós-testada.
+
+\subsection{Desafio 4.2 -- Comando \texttt{read}, Blocos Aninhados e Alocação de Prólogo}
+
+O Desafio 4.2 estabelece como critério de êxito compilar o algoritmo de Fibonacci
+(\texttt{fib.uc}), alimentá-lo com a entrada $10$ no MEPA e obter como saída os
+valores $10$ e $55$.
+
+\subsubsection{Leitura de Dados e Escopos Aninhados}
+
+O comando \texttt{read} lê um valor da entrada padrão e grava-o na memória:
+\begin{lstlisting}[language=Python]
+def p_stmt_read(p):
+    "stmt : READ '(' ID ')' ';'"
+    address = lookup_symbol(p[3], p.lineno(3))
+    emit("LEIT")
+    emit(f"ARMZ 0,{address}\t; {p[3]}")
+\end{lstlisting}
+
+Para suportar blocos aninhados com escopo léxico estático, as regras de bloco
+gerenciam a pilha \texttt{SCOPES}:
+\begin{lstlisting}[language=Python]
+def p_block(p):
+    "block : '{' enter_scope decls stmts '}'"
+    leave_scope()
+
+def p_enter_scope(p):
+    "enter_scope :"
+    enter_scope()
+
+def p_stmt_block(p):
+    "stmt : block"
+    pass
+\end{lstlisting}
+
+\subsubsection{A Decisão Crítica de Alocação no Prólogo}
+
+\noindent\textbf{O Problema da Reserva em Laço:} Se uma variável for declarada dentro
+de um bloco interno subordinado a um \texttt{while} (como \texttt{\{ int temp; \dots \}}),
+a emissão direta de \texttt{AMEM 4} durante a redução da declaração faria com que a
+instrução \texttt{AMEM} fosse reexecutada a cada iteração do laço! Isso aumentaria
+o ponteiro de topo da pilha indefinidamente, corrompendo as variáveis anteriores e
+estourando a memória da máquina de pilha.
+
+\noindent\textbf{A Solução Arquitetural:} O compilador separa a coleta de declarações
+da emissão do código. Todas as instruções \texttt{AMEM} são registradas na lista
+\texttt{ALLOCATIONS} e inseridas exclusivamente no \textbf{prólogo} do programa
+(logo após \texttt{INPP}):
+\begin{lstlisting}[language=Python]
+def compile_source(source):
+    ...
+    parser.parse(source, lexer=lexer, tracking=True)
+    return CODE[:1] + ALLOCATIONS + CODE[1:]
+\end{lstlisting}
+Dessa forma, o espaço total de memória necessário para o programa (incluindo variáveis
+de blocos aninhados) é alocado uma única vez no início, garantindo a integridade dos
+dados mesmo em repetições exaustivas.
+
+\subsubsection{Validação Experimental com Fibonacci (\texttt{exemplos/fib.uc})}
+
+\begin{lstlisting}[language=C]
+{
+    int n;
+    int a;
+    int b;
+    int i;
+    read(n);
+    print(n);
+    a = 0;
+    b = 1;
+    i = 0;
+    while (i < n) {
+        int temp;
+        temp = a + b;
+        a = b;
+        b = temp;
+        i = i + 1;
+    }
+    print(a);
+}
+\end{lstlisting}
+
+\noindent O programa aloca todas as 5 variáveis no prólogo:
+\begin{lstlisting}
+INPP
+AMEM 4    ; n address: 0
+AMEM 4    ; a address: 4
+AMEM 4    ; b address: 8
+AMEM 4    ; i address: 12
+AMEM 4    ; temp address: 16
+LEIT
+ARMZ 0,0  ; n
+CRVL 0,0  ; n
+IMPR
+...
+\end{lstlisting}
+
+\noindent Executando na MEPA com entrada 10 via arquivo de entrada:
+\begin{lstlisting}[language=bash]
+python mepa/mepa_pt.py --progfile test_fib.mepa --infile input.txt --silent
+\end{lstlisting}
+\noindent Obteve-se como saída:
+\begin{lstlisting}
+205 instrucoes executadas
+
+10
+55
+\end{lstlisting}
+satisfazendo o critério oficial do Desafio 4.2 com absoluta exatidão.
+
+\subsection{Desafio 4.3 -- Comparação Estruturada com o Compilador Java de Referência}
+
+A Tabela~\ref{tab:correspondencia} detalha a correspondência formal entre as regras
+implementadas em Python com PLY e o analisador sintático descendente recursivo
+(\texttt{Parser.java}) do compilador $\mu$C de referência.
+
+\begin{table}[H]
+\centering
+\caption{Mapeamento estruturado entre o compilador didático Java e o compilador PLY.}
+\label{tab:correspondencia}
+\small
+\begin{tabular}{p{4.2cm}p{4.8cm}p{5.5cm}}
+\toprule
+\textbf{Construção Sintática} & \textbf{Método no \texttt{Parser.java}} & \textbf{Regra PLY e Instruções MEPA} \\
+\midrule
+Bloco mestre & \texttt{program()} & \texttt{p\_program} (\texttt{INPP}, \texttt{PARA}, \texttt{FIM}) \\
+Declaração de tipos & \texttt{decls()} & \texttt{p\_decl\_int}, \texttt{p\_decl\_float} (\texttt{AMEM}) \\
+Atribuição & \texttt{assign()} & \texttt{p\_stmt\_assign} (\texttt{ARMZ 0,n}) \\
+Escrita em tela & \texttt{stmt()} (\texttt{Tag.PRINT}) & \texttt{p\_stmt\_print} (\texttt{IMPR}) \\
+Leitura de teclado & \texttt{stmt()} (\texttt{Tag.READ}) & \texttt{p\_stmt\_read} (\texttt{LEIT}, \texttt{ARMZ}) \\
+Condicional simples & \texttt{stmt()} (\texttt{Tag.IF}) & \texttt{p\_if\_head}, \texttt{p\_stmt\_if} (\texttt{DSVF}) \\
+Condicional composto & \texttt{stmt()} (\texttt{Tag.ELSE}) & \texttt{p\_else\_mark}, \texttt{p\_stmt\_if\_else} (\texttt{DSVS}) \\
+Laço pré-testado & \texttt{stmt()} (\texttt{Tag.WHILE}) & \texttt{p\_while\_start}, \texttt{p\_while\_head} (\texttt{DSVF}, \texttt{DSVS}) \\
+Laço pós-testado & \texttt{stmt()} (\texttt{Tag.DO}) & \texttt{p\_do\_head}, \texttt{p\_stmt\_do} (\texttt{DSVF}, \texttt{DSVS}) \\
+Interrupção & \texttt{stmt()} (\texttt{Tag.BREAK}) & \texttt{p\_stmt\_break} (\texttt{DSVS}) \\
+Adição / Subtração & \texttt{expr()} & \texttt{p\_expr\_plus}, \texttt{p\_expr\_minus} (\texttt{SOMA}, \texttt{SUBT}) \\
+Multiplicação / Divisão & \texttt{term()} & \texttt{p\_term\_times}, \texttt{p\_term\_divide} (\texttt{MULT}, \texttt{DIVI}) \\
+Inversão aritmética & \texttt{unary()} & \texttt{p\_unary\_minus} (\texttt{INVR}) \\
+Disjunção / Conjunção & \texttt{bool()}, \texttt{join()} & \texttt{p\_bool\_or}, \texttt{p\_bool\_and} (\texttt{DISJ}, \texttt{CONJ}) \\
+Comparações relacionais & \texttt{rel()} & \texttt{p\_relation\_cmp} (\texttt{CMIG}, \texttt{CMDG}, \texttt{CMME}, \dots) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Desafio 4.4 -- Auditoria Crítica de Código Gerado por IA}
+
+Na Seção 12.4 do roteiro, é submetido à auditoria o seguinte trecho de código
+proposto por um modelo generativo de linguagem:
+
+\begin{lstlisting}[language=Python]
+def p_stmt_while(p):
+    "stmt : WHILE '(' bool ')' stmt"
+    l1 = new_label()
+    emit(f"L{l1}:")        # (A)
+    emit(f"DSVF L{l2}")    # (B)
+    emit(f"DSVS L{l1}")    # (C)
+    emit(f"L{l2}:")        # (D)
+\end{lstlisting}
+
+\subsubsection{Identificação dos Erros Críticos}
+
+A auditoria identificou \textbf{dois erros conceituais e de execução}:
+
+\begin{enumerate}
+    \item \textbf{Erro 1 -- Falha de Escopo e Variável Inexistente (\texttt{NameError}):}
+          A variável \texttt{l2} é utilizada nas linhas (B) e (D) sem nunca ter sido
+          declarada ou instanciada. O código gerado executa apenas \texttt{l1 = new\_label()}.
+          Em Python, isso provoca uma interrupção fatal de execução (\texttt{NameError: name 'l2' is not defined}).
+    \item \textbf{Erro 2 -- Inversão Temporal de Emissão (Ordem Incorreta das Reduções):}
+          Em analisadores LALR, a função associada a uma regra só executa quando todos os
+          símbolos da produção já foram reduzidos. Isso implica que todo o código MEPA
+          de avaliação da condição (\texttt{bool}) e todo o código do corpo do laço
+          (\texttt{stmt}) já foram emitidos no fluxo de saída!
+          Assim, emitir \texttt{L1:}, \texttt{DSVF L2}, \texttt{DSVS L1} e \texttt{L2:}
+          dentro de uma única função pós-redução faz com que todas essas instruções
+          sejam agrupadas em bloco \textbf{depois} do corpo do laço. O rótulo inicial
+          fica posicionado após o corpo, o desvio condicional não protege a execução,
+          e o laço entra em comportamento caótico.
+\end{enumerate}
+
+\subsubsection{Por que o Código Parecia Plausível?}
+
+O código gerado pela IA possui alta plausibilidade superficial porque ele
+reproduz fielmente o padrão visual e descritivo encontrado em livros-texto de
+compiladores (como o clássico ``Livro do Dragão'' de Aho et al.):
+\begin{center}
+\textit{rótulo\_início} $\rightarrow$ \textit{desvio\_falso} $\rightarrow$ \textit{desvio\_retorno} $\rightarrow$ \textit{rótulo\_fim}
+\end{center}
+A falha do modelo reside na incapacidade de relacionar a \textbf{sintaxe textual}
+com a \textbf{dinâmica temporal} de um autômato ascendente com ações pós-redução.
+
+\subsubsection{Versão Corrigida e Validação}
+
+A versão correta exige desmembrar a regra em ações prévias (\texttt{while\_start} e
+\texttt{while\_head}), conforme demonstrado na Seção 7 deste relatório e comprovado
+por execução bem-sucedida na MEPA.
+
+% =========================================================
+\section{Comparação Detalhada com o Compilador de Referência}
+% =========================================================
+
+\subsection{Matriz Comparativa das Sequências de Instruções}
+
+Compilaram-se os mesmos programas-fonte em ambos os sistemas. A Tabela~\ref{tab:comparacao}
+apresenta o confronto direto das instruções emitidas.
+
+\begin{longtable}{p{2.6cm}p{6.4cm}p{6.4cm}}
+\caption{Comparação de código MEPA: Compilador Desenvolvido vs Compilador Java de Referência.}
+\label{tab:comparacao}\\
+\toprule
+\textbf{Programa} & \textbf{Compilador Desenvolvido (PLY)} & \textbf{Compilador de Referência ($\mu$C Java)} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Programa} & \textbf{Compilador Desenvolvido (PLY)} & \textbf{Compilador de Referência ($\mu$C Java)} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+
+\textbf{Expressão} &
+\texttt{INPP}\newline
+\texttt{AMEM 4 ; a}\newline
+\texttt{CRCT 1}\newline
+\texttt{CRCT 2}\newline
+\texttt{SOMA}\newline
+\texttt{ARMZ 0,0 ; a}\newline
+\texttt{PARA}\newline
+\texttt{FIM} &
+\texttt{INPP}\newline
+\texttt{AMEM 4 ; a}\newline
+\texttt{AMEM 4 ; temp (ponteiro)}\newline
+\texttt{CRCT 1}\newline
+\texttt{CRCT 2}\newline
+\texttt{SOMA}\newline
+\texttt{ARMZ 0,0 ; a}\newline
+\texttt{DMEM 8}\newline
+\texttt{PARA}\newline
+\texttt{FIM} \\
+\midrule
+
+\textbf{Condicional \texttt{if-else}} &
+\texttt{INPP}\newline
+\texttt{AMEM 4 ; a}\newline
+\texttt{CRCT 5}\newline
+\texttt{ARMZ 0,0}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{CRCT 0}\newline
+\texttt{CMMA}\newline
+\texttt{DSVF L1}\newline
+\texttt{CRCT 1}\newline
+\texttt{ARMZ 0,0}\newline
+\texttt{DSVS L2}\newline
+\texttt{L1: NADA}\newline
+\texttt{CRCT 2}\newline
+\texttt{ARMZ 0,0}\newline
+\texttt{L2: NADA}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{IMPR}\newline
+\texttt{PARA}\newline
+\texttt{FIM} &
+\texttt{INPP}\newline
+\texttt{AMEM 4 ; a}\newline
+\texttt{AMEM 4 ; temp (ponteiro)}\newline
+\texttt{CRCT 5}\newline
+\texttt{ARMZ 0,0}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{CRCT 0}\newline
+\texttt{CMMA}\newline
+\texttt{DSVF L1}\newline
+\texttt{CRCT 1}\newline
+\texttt{ARMZ 0,0}\newline
+\texttt{DSVS L2}\newline
+\texttt{L1:}\newline
+\texttt{CRCT 2}\newline
+\texttt{ARMZ 0,0}\newline
+\texttt{L2:}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{IMPR}\newline
+\texttt{DMEM 8}\newline
+\texttt{PARA}\newline
+\texttt{FIM} \\
+\midrule
+
+\textbf{Laço \texttt{while}} &
+\texttt{INPP}\newline
+\texttt{AMEM 4 ; k}\newline
+\texttt{CRCT 1}\newline
+\texttt{ARMZ 0,0}\newline
+\texttt{L1: NADA}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{CRCT 5}\newline
+\texttt{CMEG}\newline
+\texttt{DSVF L2}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{IMPR}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{CRCT 1}\newline
+\texttt{SOMA}\newline
+\texttt{ARMZ 0,0}\newline
+\texttt{DSVS L1}\newline
+\texttt{L2: NADA}\newline
+\texttt{PARA}\newline
+\texttt{FIM} &
+\texttt{INPP}\newline
+\texttt{AMEM 4 ; k}\newline
+\texttt{AMEM 4 ; temp (ponteiro)}\newline
+\texttt{CRCT 1}\newline
+\texttt{ARMZ 0,0}\newline
+\texttt{L1:}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{CRCT 5}\newline
+\texttt{CMEG}\newline
+\texttt{DSVF L2}\newline
+\texttt{AMEM 4 ; temp (ponteiro)}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{IMPR}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{CRCT 1}\newline
+\texttt{SOMA}\newline
+\texttt{ARMZ 0,0}\newline
+\texttt{DMEM 4}\newline
+\texttt{DSVS L1}\newline
+\texttt{L2:}\newline
+\texttt{DMEM 8}\newline
+\texttt{PARA}\newline
+\texttt{FIM} \\
+\midrule
+
+\textbf{Interrupção \texttt{break}} &
+\texttt{...}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{CRCT 5}\newline
+\texttt{CMMA}\newline
+\texttt{DSVF L3}\newline
+\texttt{\textbf{DSVS L2 ; break}}\newline
+\texttt{L3: NADA}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{IMPR}\newline
+\texttt{...} &
+\texttt{...}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{CRCT 5}\newline
+\texttt{CMMA}\newline
+\texttt{DSVF L3}\newline
+\textit{[DSVS omitido por falha]}\newline
+\texttt{L3:}\newline
+\texttt{CRVL 0,0}\newline
+\texttt{IMPR}\newline
+\texttt{...} \\
+\end{longtable}
+
+\subsection{Análise das Divergências Encontradas}
+
+A análise comparativa evidencia quatro divergências principais:
+
+\begin{enumerate}
+    \item \textbf{Slot de Ponteiro Temporário (\texttt{AMEM 4 ; temp}):} O gerador Java
+          reserva compulsoriamente um slot temporário de 4 bytes a cada bloco para dar
+          suporte a atribuições indiretas via arranjos e ponteiros (\texttt{Env.reserveTemp}).
+          Como o nosso compilador implementou a especificação de tradução do laboratório,
+          ele emite apenas o espaço requerido pelas variáveis declaradas.
+    \item \textbf{Desalocação Dinâmica com \texttt{DMEM}:} O compilador Java emite
+          instruções \texttt{DMEM} ao final de cada bloco de comandos para desempilhar
+          variáveis locais. O nosso compilador adota o modelo estático de memória plana
+          com alocação consolidada no prólogo, garantindo segurança contra estouro de
+          pilha em laços.
+    \item \textbf{Rótulos em Linha Própria vs \texttt{label: NADA}:} O compilador Java
+          escreve rótulos isolados, demandando pós-processamento externo para a MEPA.
+          O nosso compilador emite \texttt{L1: NADA}, sendo imediatamente executável.
+    \item \textbf{Correção Semântica do \texttt{break}:} O compilador de referência
+          omite o desvio \texttt{DSVS} do break. O nosso compilador gera a instrução
+          correta, garantindo a saída imediata do laço.
+\end{enumerate}
+
+% =========================================================
+\section{Decisões de Implementação}
+% =========================================================
+
+\subsection{Dicionário de Palavras Reservadas vs Expressões Regulares Específicas}
+
+Decidiu-se mapear palavras-chave através do dicionário \texttt{reserved} em conjunto
+com a regra genérica de identificadores \texttt{t\_ID}.
+
+\noindent\textit{Alternativa descartada:} Criar regras específicas como \texttt{t\_IF = r'if'}.
+
+\noindent\textit{Justificativa:} A criação de regras dedicadas aumenta desnecessariamente
+o autômato léxico e cria armadilhas com identificadores que possuem palavras reservadas
+como prefixo (como \texttt{ifx} ou \texttt{while1}). O uso do dicionário garante tempo
+$O(1)$ de consulta e total previsibilidade.
+
+\subsection{Alocação no Prólogo vs Emissão no Ponto da Declaração}
+
+Optou-se por acumular as instruções de alocação de memória na lista \texttt{ALLOCATIONS}
+e emiti-las todas no prólogo, imediatamente após \texttt{INPP}.
+
+\noindent\textit{Alternativa descartada:} Emitir \texttt{AMEM} no corpo da produção
+no exato instante em que a declaração é reduzida.
+
+\noindent\textit{Justificativa:} Caso uma declaração ocorra dentro de um bloco aninhado
+que esteja no interior de um \texttt{while} ou \texttt{do-while}, emitir \texttt{AMEM}
+no ponto da redução repetiria a alocação a cada iteração do laço, estourando a pilha da MEPA.
+
+\subsection{Tabela de Símbolos com Pilha de Escopos}
+
+Adotou-se uma pilha de dicionários (\texttt{SCOPES = []}) para representar o escopo
+léxico, complementada pelo controle linear de \texttt{OFFSET}.
+
+\noindent\textit{Alternativa descartada:} Dicionário simples sem controle de escopo.
+
+\noindent\textit{Justificativa:} A pilha de escopos permite sombreamento legítimo de variáveis
+em blocos aninhados, enquanto rejeita re-declarações ilegais dentro do mesmo bloco e
+rejeita acessos a variáveis fora de escopo.
+
+\subsection{Emissão Integrada com \texttt{NADA} para MEPA}
+
+Adotou-se o formato \texttt{mark\_label(label)} emitindo \texttt{f"{label}: NADA"}.
+
+\noindent\textit{Alternativa descartada:} Depender do script \texttt{awk} sugerido na Seção 11 do guia.
+
+\noindent\textit{Justificativa:} A eliminação de dependências externas torna o pipeline de
+compilação autosuficiente e portátil entre diferentes sistemas operacionais (Windows/Linux).
+
+% =========================================================
+\section{Evidências Experimentais e Comandos de Reprodução}
+% =========================================================
+
+Todos os testes podem ser reproduzidos na raiz do projeto com os seguintes comandos:
+
+\subsection{Teste 1: Expressões e Precedência}
+\begin{lstlisting}[language=bash]
+python lab1_tds.py exemplos/expr.uc -o test_expr.mepa
+python mepa/mepa_pt.py --progfile test_expr.mepa --silent
+# Resultado: Executa 7 instrucoes com sucesso.
+\end{lstlisting}
+
+\subsection{Teste 2: Condicional \texttt{if-else}}
+\begin{lstlisting}[language=bash]
+python lab1_tds.py exemplos/if_else.uc -o test_if.mepa
+python mepa/mepa_pt.py --progfile test_if.mepa --silent
+# Saida observada: 1 (para a = 5) e 2 (para a = -5).
+\end{lstlisting}
+
+\subsection{Teste 3: Laço \texttt{while}}
+\begin{lstlisting}[language=bash]
+python lab1_tds.py exemplos/while.uc -o test_while.mepa
+python mepa/mepa_pt.py --progfile test_while.mepa --silent
+# Saida observada: 1, 2, 3, 4, 5.
+\end{lstlisting}
+
+\subsection{Teste 4: Interrupção por \texttt{break}}
+\begin{lstlisting}[language=bash]
+python lab1_tds.py exemplos/break.uc -o test_break.mepa
+python mepa/mepa_pt.py --progfile test_break.mepa --silent
+# Saida observada: 1, 2, 3, 4, 5 (laco interrompido ao atingir k > 5).
+\end{lstlisting}
+
+\subsection{Teste 5: Desafio 4.1 (\texttt{do-while})}
+\begin{lstlisting}[language=bash]
+python lab1_tds.py exemplos/do_while.uc -o test_do_while.mepa
+python mepa/mepa_pt.py --progfile test_do_while.mepa --silent
+# Saida observada: 1, 2, 3.
+\end{lstlisting}
+
+\subsection{Teste 6: Desafio 4.2 (Fibonacci com \texttt{read} e Entrada 10)}
+\begin{lstlisting}[language=bash]
+python lab1_tds.py exemplos/fib.uc -o test_fib.mepa
+python mepa/mepa_pt.py --progfile test_fib.mepa --infile input.txt --silent
+# Saida observada: 10 e 55 (205 instrucoes MEPA).
+\end{lstlisting}
+
+% =========================================================
+\section{Dificuldades Encontradas e Soluções}
+% =========================================================
+
+\begin{enumerate}
+    \item \textbf{Atributos Herdados no Modelo Ascendente:} Compreender por que o desvio
+          condicional \texttt{DSVF} ficava posicionado após o corpo do \texttt{if} quando
+          emitido na redução da regra foi a principal dificuldade teórica do trabalho.
+          A superação dessa barreira exigiu internalizar o conceito de ações semânticas
+          intermediárias (\textit{mid-rule actions}) simuladas por regras vazias e
+          pilhas de controle globais (\texttt{IF\_PENDING}, \texttt{WHILE\_PENDING}).
+    \item \textbf{Alocação de Memória dentro de Laços:} Ao testar blocos aninhados contendo
+          declarações dentro de repetições, notou-se o perigo da multiplicação descontrolada
+          de instruções \texttt{AMEM}. A solução concebida pela equipe (prolongar a emissão
+          de \texttt{AMEM} para o prólogo) garantiu estabilidade e conformidade total
+          com a arquitetura MEPA.
+    \item \textbf{Particularidade da MEPA com Ponto Flutuante:} Descobriu-se durante os
+          testes que o carregador da MEPA 5.0 (\texttt{fixArgs} em \texttt{mepa\_defs.py})
+          valida os argumentos das instruções utilizando o método \texttt{a.isdigit()},
+          rejeitando constantes fracionárias literais como \texttt{0.0314}. O compilador
+          calcula e aloca perfeitamente os 8 bytes de \texttt{float}, mas para simulações
+          completas na MEPA os cálculos devem utilizar dados inteiros.
+\end{enumerate}
+
+% =========================================================
+\section{Conclusão}
+% =========================================================
+
+A realização do Laboratório 1 permitiu consolidar de forma prática e aprofundada os
+fundamentos de compilação estudados ao longo dos Módulos 1, 2, 3 e 4. A utilização
+do gerador PLY demonstrou a viabilidade de construir um compilador funcional e
+robusto com código enxuto e de alta legibilidade.
+
+A técnica de Tradução Dirigida por Sintaxe revelou sua elegância ao permitir que a
+própria estrutura da derivação sintática guie a emissão do código executável da
+máquina de pilha. O domínio dos conceitos de atributos sintetizados e herdados foi
+determinante para solucionar os desafios de controle de fluxo (\texttt{if}, \texttt{while},
+\texttt{do-while} e \texttt{break}).
+
+Por fim, a comparação minuciosa contra o compilador Java de referência e a auditoria
+crítica de código gerado por IA comprovaram que o entendimento teórico dos mecanismos
+internos de um compilador é absolutamente insubstituível para projetar, depurar e
+garantir a segurança de linguagens e ferramentas de software.
+
+% =========================================================
+\section{Declaração de Uso de Inteligência Artificial (Escala AIAS)}
+% =========================================================
+
+Em estrita consonância com a Política Institucional de Uso de Inteligência Artificial
+da UNIFEI e com a Seção 14 do guia da disciplina, os integrantes da equipe declaram:
+
+\subsection*{Aluno 1}
+Declaro que utilizei ferramentas de inteligência artificial estritamente dentro dos
+limites autorizados pela política da disciplina (Escala AIAS). Nos Passos 1 a 3, a IA
+foi consultada em nível auxiliar (\textbf{AIAS Nível 2}) para esclarecimento de mensagens
+de erro do PLY e verificação de regras de formatação. Os núcleos conceituais dos
+Passos 4 e 5 (\textit{mid-rule actions}, atributos herdados e pilhas de desvio) foram
+concebidos, codificados e validados de forma integralmente autoral pela equipe
+(\textbf{AIAS Nível 1 -- Sem IA}). No Desafio 4.4, atuei como auditor crítico
+(\textbf{AIAS Nível 4}), diagnosticando as falhas da solução proposta pelo modelo e
+fundamentando o veredito técnico com base na teoria de autômatos ascendentes.
+
+\subsection*{Aluno 2}
+Declaro que respeitei integralmente a política de uso de IA estipulada para a atividade.
+O desenvolvimento dos mecanismos de controle de fluxo (condicionais e laços) e o
+desenho das estruturas de dados de escopo foram resolvidos de forma estritamente autoral
+com os colegas de grupo (\textbf{AIAS Nível 1}), constituindo evidência concreta de
+aprendizado. As consultas a ferramentas generativas restringiram-se a aspectos de
+sintaxe do PLY e revisão tipográfica do texto em \LaTeX{} (\textbf{AIAS Nível 2}).
+
+% =========================================================
+\section{Referências Bibliográficas}
+% =========================================================
+
+\begin{thebibliography}{9}
+
+\bibitem{aho2008}
+AHO, Alfred V.; LAM, Monica S.; SETHI, Ravi; ULLMAN, Jeffrey D.
+\textit{Compiladores: princípios, técnicas e ferramentas}.
+2. ed. São Paulo: Pearson, 2008.
+
+\bibitem{ply}
+BEASLEY, David.
+\textit{PLY (Python Lex-Yacc) Documentation}.
+Disponível em: \url{https://www.dabeaz.com/ply/}. Acesso em: out. 2026.
+
+\bibitem{louden}
+LOUDEN, Kenneth C.
+\textit{Compiladores: princípios e práticas}.
+São Paulo: Pioneira Thomson Learning, 2004.
+
+\bibitem{mepa}
+KOWALTOWSKI, Tomasz.
+\textit{MEPA 5.0 -- Interpretador e especificação das instruções}.
+Instituto de Computação, Universidade Estadual de Campinas (UNICAMP), 2015.
+
+\end{thebibliography}
+
+\end{document}
