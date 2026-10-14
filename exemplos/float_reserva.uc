@@ -1,0 +1,6 @@
+{
+    float x;
+    int a;
+    a = 3;
+    print(a);
+}
