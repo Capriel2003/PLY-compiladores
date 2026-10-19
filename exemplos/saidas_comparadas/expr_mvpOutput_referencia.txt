@@ -1,0 +1,10 @@
+    INPP
+    AMEM 4	; a address: 0
+    AMEM 4	; temp (ponteiro)
+    CRCT 1
+    CRCT 2
+    SOMA
+    ARMZ 0,0	; a
+    DMEM 8
+    PARA
+    FIM
